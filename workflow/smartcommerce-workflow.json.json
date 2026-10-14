@@ -1,0 +1,802 @@
+{
+  "name": "E-commerce",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "SmartCommerce - Place Your Order",
+        "formDescription": "Order your matcha accessories below",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Customer Name"
+            },
+            {
+              "fieldLabel": "Email Address",
+              "fieldType": "email"
+            },
+            {
+              "fieldLabel": "Product",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Matcha Starter Kit"
+                  },
+                  {
+                    "option": "Bamboo Matcha Whisk"
+                  },
+                  {
+                    "option": "Ceramic Matcha Bowl"
+                  }
+                ]
+              }
+            },
+            {
+              "fieldLabel": "Quantity",
+              "fieldType": "number"
+            },
+            {
+              "fieldLabel": "Delivery Address",
+              "fieldType": "textarea"
+            },
+            {
+              "fieldLabel": "Phone Number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "id": "f8ff2960-4a34-4d84-9e96-5ea5b302c0be",
+      "name": "On form submission",
+      "webhookId": "01d398a2-5e8d-42f3-a5e2-722309bafe29",
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s",
+          "mode": "list",
+          "cachedResultName": "SmartCommerce - Store Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Products",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit#gid=0"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "32e4d1eb-dc9a-4a97-a51f-0112963f77d4",
+      "name": "Get row(s) in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZRvMOYcRLBGv3UGs",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst order = $('On form submission').first().json;\nconst products = $input.all().map(item => item.json);\n\nconst productName = String(order['Product'] ?? '').trim();\nconst quantity = Number(order['Quantity']);\n\nconst product = products.find(\n  p => String(p.Product_Name).trim() === productName\n);\n\nconst validQuantity =\n  Number.isInteger(quantity) && quantity > 0;\n\nconst stock = product ? Number(product.Stock) : 0;\nconst price = product ? Number(product.Price) : 0;\n\nconst validProductData =\n  !!product &&\n  Number.isFinite(stock) &&\n  Number.isInteger(stock) &&\n  stock >= 0 &&\n  Number.isFinite(price) &&\n  price >= 0;\n\nconst available =\n  validProductData &&\n  validQuantity &&\n  stock >= quantity;\n\nconst total = available ? price * quantity : 0;\nconst remainingStock = available ? stock - quantity : stock;\n\nreturn [{\n  json: {\n    orderId: `SC-${Date.now()}`,\n    customerName: order['Customer Name'],\n    email: order['Email Address'],\n    phone: order['Phone Number'],\n    address: order['Delivery Address'],\n    productId: product?.Product_ID ?? null,\n    productName,\n    quantity,\n    unitPrice: price,\n    total,\n    currentStock: stock,\n    remainingStock,\n    lowStockThreshold: Number(product?.Low_Stock_Threshold ?? 0),\n    stockAvailable: available,\n    status: available ? 'Pending' : 'Rejected',\n    orderDate: new Date().toISOString()\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "f3ffb2f9-bb62-42fa-adef-ff858541ffa4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "50658bb2-ff29-4f52-b888-8a6b6bdc97bb",
+              "leftValue": "={{ $json.stockAvailable }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "id": "1586f504-c376-4bb4-9a18-a1ffb52eba1c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s",
+          "mode": "list",
+          "cachedResultName": "SmartCommerce - Store Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Products",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Product_ID": "={{ $json.productId }}",
+            "Stock": "={{ $json.remainingStock }}"
+          },
+          "matchingColumns": [
+            "Product_ID"
+          ],
+          "schema": [
+            {
+              "id": "Product_ID",
+              "displayName": "Product_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Product_Name",
+              "displayName": "Product_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Price",
+              "displayName": "Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Stock",
+              "displayName": "Stock",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Low_Stock_Threshold",
+              "displayName": "Low_Stock_Threshold",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        -96
+      ],
+      "id": "bf2471e7-1c5d-4a6c-95c9-8f85a9526e78",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZRvMOYcRLBGv3UGs",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s",
+          "mode": "list",
+          "cachedResultName": "SmartCommerce - Store Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1921831640,
+          "mode": "list",
+          "cachedResultName": "Orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit#gid=1921831640"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order_ID": "={{ $('Code in JavaScript').first().json.orderId }}",
+            "Customer_Name": "={{ $('On form submission').item.json['Customer Name'] }}",
+            "Email": "={{ $('On form submission').item.json['Email Address'] }}",
+            "Product_Name": "={{ $('On form submission').item.json.Product }}",
+            "Quantity": "={{ $('On form submission').item.json.Quantity }}",
+            "Delivery_Address": "={{ $('On form submission').item.json['Delivery Address'] }}",
+            "Phone": "={{ $('On form submission').item.json['Phone Number'] }}",
+            "Order_Date": "={{ $('On form submission').item.json.submittedAt }}",
+            "Status": "={{ $('Code in JavaScript').first().json.status }}",
+            "Unit_Price": "={{ $('Code in JavaScript').first().json.unitPrice }}",
+            "Total": "={{ $('Code in JavaScript').first().json.total }}",
+            "Product_ID": "={{ $('Code in JavaScript').first().json.productId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Order_ID",
+              "displayName": "Order_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer_Name",
+              "displayName": "Customer_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product_ID",
+              "displayName": "Product_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product_Name",
+              "displayName": "Product_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Unit_Price",
+              "displayName": "Unit_Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Delivery_Address",
+              "displayName": "Delivery_Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Order_Date",
+              "displayName": "Order_Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1120,
+        -96
+      ],
+      "id": "bcf5d21d-4d20-466d-a150-e38b50b9b328",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZRvMOYcRLBGv3UGs",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s",
+          "mode": "list",
+          "cachedResultName": "SmartCommerce - Store Database",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1921831640,
+          "mode": "list",
+          "cachedResultName": "Orders",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1YYePAhXOxpPmyxd2q-GPk4JDYvMEm1GxCcldZQDCm3s/edit#gid=1921831640"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Order_ID": "={{ $('Code in JavaScript').first().json.orderId }}",
+            "Customer_Name": "={{ $('Code in JavaScript').first().json.customerName }}",
+            "Email": "={{ $('Code in JavaScript').first().json.email }}",
+            "Product_ID": "={{ $('Code in JavaScript').first().json.productId }}",
+            "Product_Name": "={{ $('Code in JavaScript').first().json.productName }}",
+            "Quantity": "={{ $('Code in JavaScript').first().json.quantity }}",
+            "Delivery_Address": "={{ $('Code in JavaScript').first().json.address }}",
+            "Total": "0",
+            "Phone": "={{ $('Code in JavaScript').first().json.phone }}",
+            "Unit_Price": "={{ $('Code in JavaScript').first().json.unitPrice }}",
+            "Order_Date": "={{ $('Code in JavaScript').first().json.orderDate }}",
+            "Status": "Rejected"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Order_ID",
+              "displayName": "Order_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Customer_Name",
+              "displayName": "Customer_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product_ID",
+              "displayName": "Product_ID",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Product_Name",
+              "displayName": "Product_Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Quantity",
+              "displayName": "Quantity",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Unit_Price",
+              "displayName": "Unit_Price",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Total",
+              "displayName": "Total",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Delivery_Address",
+              "displayName": "Delivery_Address",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Phone",
+              "displayName": "Phone",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Order_Date",
+              "displayName": "Order_Date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        896,
+        96
+      ],
+      "id": "09b21336-63e1-414e-91e5-1769cc83587b",
+      "name": "Append row in sheet1",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "ZRvMOYcRLBGv3UGs",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').item.json.email }}",
+        "subject": "={{ 'SmartCommerce - Order ' + $('Code in JavaScript').first().json.orderId }}",
+        "emailType": "text",
+        "message": "= {{ `Hello ${$('Code in JavaScript').first().json.customerName},  Thank you for ordering from SmartCommerce!  ORDER SUMMARY ---------------------------- Order ID: ${$('Code in JavaScript').first().json.orderId} Product: ${$('Code in JavaScript').first().json.productName} Quantity: ${$('Code in JavaScript').first().json.quantity} Unit Price: ${$('Code in JavaScript').first().json.unitPrice} TND Total: ${$('Code in JavaScript').first().json.total} TND  Delivery Address: ${$('Code in JavaScript').first().json.address}  Order Status: Pending  Your order has been recorded and is awaiting confirmation. This email is not proof of payment.  Thank you, SmartCommerce Team` }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        -96
+      ],
+      "id": "10a446a2-13df-45cc-9c63-83788509920d",
+      "name": "Send a message",
+      "webhookId": "cbdf26b5-4872-476b-802c-6af3993452d5",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "DLrk2o84zCkPzJvN",
+          "name": "Gmail account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Code in JavaScript').item.json.email }}",
+        "subject": "SmartCommerce - Order Could Not Be Processed",
+        "emailType": "text",
+        "message": "=\n{{ `Hello ${$('Code in JavaScript').first().json.customerName},\n\nThank you for your interest in SmartCommerce.\n\nUnfortunately, we could not process your order.\n\nProduct: ${$('Code in JavaScript').first().json.productName}\nRequested Quantity: ${$('Code in JavaScript').first().json.quantity}\n\nThe product may be out of stock, or the order information may be invalid.\n\nNo inventory has been deducted.\n\nPlease contact us to check availability.\n\nThank you,\nSmartCommerce Team` }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        96
+      ],
+      "id": "cd64c0d8-3318-4650-aa5c-4eb003c80a7b",
+      "name": "Send a message1",
+      "webhookId": "b399325b-5f16-44af-b98d-4531606afb69",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "JnGpQagV0H5ENJMo",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "43fb3390-6782-4853-80fd-355ae3d65e07",
+              "leftValue": "={{ $('Code in JavaScript').first().json.remainingStock <= $('Code in JavaScript').first().json.lowStockThreshold }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1504,
+        -80
+      ],
+      "id": "464b1882-6d9e-4c88-8b75-eae437680995",
+      "name": "IF - Low Stock Alert"
+    },
+    {
+      "parameters": {
+        "sendTo": "benfekihnourrr@gmail.com",
+        "subject": "SmartCommerce - Low Stock Alert",
+        "emailType": "text",
+        "message": "=\n{{ `SMARTCOMMERCE INVENTORY ALERT\n\nA product has reached its low-stock threshold.\n\nProduct: ${$('Code in JavaScript').first().json.productName}\nProduct ID: ${$('Code in JavaScript').first().json.productId}\n\nRemaining Stock: ${$('Code in JavaScript').first().json.remainingStock}\nLow-Stock Threshold: ${$('Code in JavaScript').first().json.lowStockThreshold}\n\nLast Order ID: ${$('Code in JavaScript').first().json.orderId}\n\nACTION REQUIRED:\nReview inventory and consider restocking this product.\n\nSmartCommerce Automated Inventory System` }}\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1728,
+        -176
+      ],
+      "id": "a58f3880-968a-41f6-abfb-6bae59fdea62",
+      "name": "Send a message2",
+      "webhookId": "b2e9afe3-418e-4864-8117-325231658d9c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "JnGpQagV0H5ENJMo",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Get row(s) in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Append row in sheet1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet1": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "IF - Low Stock Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Low Stock Alert": {
+      "main": [
+        [
+          {
+            "node": "Send a message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "13ab1d56-9d07-4883-be8f-5e2fc117af36",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "360d7a71ff7dfb9d95c456b77f17c703ec2039b593646f19cd12c327e8750d4b"
+  },
+  "nodeGroups": [],
+  "id": "nNszdeJse59e4cVh",
+  "tags": []
+}
